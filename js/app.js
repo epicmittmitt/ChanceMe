@@ -180,10 +180,35 @@ getdata.onclick = function () {
 }
 
 function getTotalApplicantScore(TA) {
+    var college = actual_JSON[index];
+    stats_gpa.innerText = college.GPA;
+    stats_rate.innerText = college.ADMISSION * 100;
+    stats_sat_25.innerText = college.SAT_25;
+    stats_sat_75.innerText = college.SAT_75;
+    stats_act_25.innerText = college.ACT_25;
+    stats_act_75.innerText = college.ACT_75;
+    stats_address.innerText = college.ADDRESS;
+    stats_address.innerText = college.ADDRESS;
+    var test = satbox.value > 36 ? satbox.value : Math.round(satbox.value * 1600 / 36);
+    var _objective = getObjectiveScore(gpabox.value, ap5box.value, ap4box.value, test);
+    var comp = _objective + (sub / 3);
+    var subScaled = (sub / 3);
+    var collegeAP5 = (.9 / college.ADMISSION * 100); 
+    var collegeAP4 = 0;
+    var collegeAvgSAT = (college.SAT_25 + college.SAT_75) / 2;
+    var collegeObjectiveScore75 = getObjectiveScore(college.GPA, collegeAP5, 0, college.SAT_75);
+    var collegeObjectiveScore50 = getObjectiveScore(college.GPA, collegeAP5, 0, collegeAvgSAT);
+    var aboveAverageApplicant = false; 
+    var exceptionalApplicant = false; 
+    if (_objective > collegeObjectiveScore50) aboveAverageApplicant = true;
+    if (_objective > collegeObjectiveScore75) exceptionalApplicant = true; 
+    if (aboveAverageApplicant = true) comp = (1.2 * _objective) + (.8) * (sub/2); 
+    if (exceptionalApplicant = true) comp = (1.4 * _objective) + (.6) * (sub/2);
+    var differenceObjective = (_objective - collegeObjectiveScore75); 
     var index = ids.indexOf(cinput.value);
     var acceptance = actual_JSON[index].ADMISSION;
     if (TA >= 90) TA = 89.9; 
-    var final = 112 - TA;
+    var final = 112 - (TA + differenceObjective);
     final /= acceptance;
     final /= TA;
     final = TA / final;
