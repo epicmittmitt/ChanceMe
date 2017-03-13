@@ -104,23 +104,62 @@ $("span[title]").click(function () {
     }
 })
 
-function getObjectiveScore(gpa, ap5, ap4, sat) {
+function getObjectiveScore(gpa, apsTaken, honorsTaken, sat) {
     var index = ids.indexOf(cinput.value);
     var college = actual_JSON[index];
     var output = 0;
-    var sat_coeff = 100;
-    if (sat < college.SAT_25) sat_coeff = 120;
-    if (sat > college.SAT_75) sat_coeff = 80;
-    output += sat / (sat_coeff / (sat / 1600));
-    var gpa_coeff = 0.2;
-    if (gpa < college.GPA) gpa_coeff = 0.25;
-    output += gpa / (gpa_coeff / (gpa / 4));
+    var max_sat = 1600;
+    var sat_coeff = sat / 100;
+    if (sat < college.SAT_25) sat_coeff = sat / 120;
+    if (sat > college.SAT_75) sat_coeff = sat / 80;
+    output += sat_coeff * (sat / max_sat); 
+    console.log(sat);
+    var gpa_coeff = gpa / 0.2;
+    if (gpa < college.GPA) gpa_coeff = gpa / 0.25;
+    var max_gpa = 4;
+    output += gpa_coeff * (gpa / max_gpa);
+    console.log(output);
  
-    var aps = parseFloat(ap5) + ap4 / 2;
+    var honorsWeight = 0.5;
+    var aps = parseFloat(apsTaken) + honorsTaken * honorsWeight;
     if (aps > 10) aps = 10;
     var objectiveScoreFinal = output + aps;
 
     return Math.round(100 * (objectiveScoreFinal)) / 100;
+}
+
+function actToSatConvert(testScore) {
+    // More accurate score conversion than regular scaling
+    // Uses official concordance tables
+    switch(testScore) {
+        case 11: return 530; break;
+        case 12: return 585; break;
+        case 13: return 640; break;
+        case 14: return 690; break;
+        case 15: return 740; break;
+        case 16: return 790; break;
+        case 17: return 835; break;
+        case 18: return 875; break;
+        case 19: return 915; break;
+        case 20: return 955; break;
+        case 21: return 995; break;
+        case 22: return 1030; break;
+        case 23: return 1065; break;
+        case 24: return 1105; break;
+        case 25: return 1145; break;
+        case 26: return 1185; break;
+        case 27: return 1225; break;
+        case 28: return 1265; break;
+        case 29: return 1305; break;
+        case 30: return 1340; break;
+        case 31: return 1375; break;
+        case 32: return 1415; break;
+        case 33: return 1460; break;
+        case 34: return 1510; break;
+        case 35: return 1565; break;
+        case 36: return 1600; break;
+        default: return 0;
+    }
 }
 
 
@@ -150,7 +189,8 @@ getdata.onclick = function () {
     stats_act_75.innerText = college.ACT_75;
     stats_address.innerText = college.ADDRESS;
     stats_address.innerText = college.ADDRESS;
-    var test = satbox.value > 36 ? satbox.value : Math.round(satbox.value * 1600 / 36);
+    var test = parseInt(satbox.value) > 36 ? parseInt(satbox.value) : actToSatConvert(parseInt(satbox.value));
+    // ap5box is number of AP/IB, ap4box is honors classes taken
     var _objective = getObjectiveScore(gpabox.value, ap5box.value, ap4box.value, test);
     var comp = _objective + (sub / 3);
     var subScaled = (sub / 3);

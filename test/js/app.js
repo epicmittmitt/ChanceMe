@@ -96,32 +96,70 @@ loadJSON(function (response) {
 });
 
 $("span[title]").click(function () {
-  var $title = $(this).find(".title");
-  if (!$title.length) {
-    $(this).append('<span class="title">' + $(this).attr("title") + '</span>');
-  } else {
-    $title.remove();
-  }
+    var $title = $(this).find(".title");
+    if (!$title.length) {
+        $(this).append('<span class="title">' + $(this).attr("title") + '</span>');
+    } else {
+        $title.remove();
+    }
 })
 
-function getObjectiveScore(gpa, ap5, ap4, sat) {
+function getObjectiveScore(gpa, apsTaken, honorsTaken, sat) {
     var index = ids.indexOf(cinput.value);
     var college = actual_JSON[index];
     var output = 0;
-    var sat_coeff = 100;
-    if (sat < college.SAT_25) sat_coeff = 120;
-    if (sat > college.SAT_75) sat_coeff = 80;
-    output += sat / (sat_coeff / (sat / 1600));
-    var gpa_coeff = 0.2;
-    if (gpa < college.GPA) gpa_coeff = 0.25;
-    output += gpa / (gpa_coeff / (gpa / .4));
-    if (output > 0) var scaledObjectiveAdd = (output/50);
-    output +=  (scaledObjectiveAdd/.1); 
-    var aps = parseFloat(ap5) + ap4 / 2;
-    if (aps > 10) aps = 10; 
-    var objectiveScoreFinal = output + aps; 
-     
+    var max_sat = 1600;
+    var sat_coeff = sat / 100;
+    if (sat < college.SAT_25) sat_coeff = sat / 120;
+    if (sat > college.SAT_75) sat_coeff = sat / 80;
+    output += sat_coeff * (sat / max_sat); 
+    console.log(sat);
+    var gpa_coeff = gpa / 0.2;
+    if (gpa < college.GPA) gpa_coeff = gpa / 0.25;
+    var max_gpa = 4;
+    output += gpa_coeff * (gpa / max_gpa);
+    console.log(output);
+ 
+    var honorsWeight = 0.5;
+    var aps = parseFloat(apsTaken) + honorsTaken * honorsWeight;
+    if (aps > 10) aps = 10;
+    var objectiveScoreFinal = output + aps;
+
     return Math.round(100 * (objectiveScoreFinal)) / 100;
+}
+
+function actToSatConvert(testScore) {
+    // More accurate score conversion than regular scaling
+    // Uses official concordance tables
+    switch(testScore) {
+        case 11: return 530; break;
+        case 12: return 585; break;
+        case 13: return 640; break;
+        case 14: return 690; break;
+        case 15: return 740; break;
+        case 16: return 790; break;
+        case 17: return 835; break;
+        case 18: return 875; break;
+        case 19: return 915; break;
+        case 20: return 955; break;
+        case 21: return 995; break;
+        case 22: return 1030; break;
+        case 23: return 1065; break;
+        case 24: return 1105; break;
+        case 25: return 1145; break;
+        case 26: return 1185; break;
+        case 27: return 1225; break;
+        case 28: return 1265; break;
+        case 29: return 1305; break;
+        case 30: return 1340; break;
+        case 31: return 1375; break;
+        case 32: return 1415; break;
+        case 33: return 1460; break;
+        case 34: return 1510; break;
+        case 35: return 1565; break;
+        case 36: return 1600; break;
+        default: return 0;
+    }
 }
 
 
@@ -136,57 +174,63 @@ getdata.onclick = function () {
         warning.style = "text-align: center; display: block; color: red";
         return;
     }
-    if (gpabox.value < 0 || gpabox.value > 4) { return; }
+    if (gpabox.value < 0 || gpabox.value > 4) {
+        return;
+    }
     // getdata.disabled = true;
     details_link.style = "border-bottom: 1px dotted; cursor: pointer; display: inline";
-    var test = satbox.value > 36 ? satbox.value : Math.round(satbox.value * 1600 / 36);
-    var _objective = getObjectiveScore(gpabox.value, ap5box.value, ap4box.value, test);
-    var comp = _objective + (sub / 3);
+    var index = ids.indexOf(cinput.value);
+    var college = actual_JSON[index];
     stats_gpa.innerText = college.GPA;
-    stats_rate.innerText = college.ADMISSION;
+    stats_rate.innerText = college.ADMISSION * 100;
     stats_sat_25.innerText = college.SAT_25;
     stats_sat_75.innerText = college.SAT_75;
-    stats_rate.innerText = college.ADMISSION;
-    var collegeAP5 = (.9 / college.ADMISSION); 
+    stats_act_25.innerText = college.ACT_25;
+    stats_act_75.innerText = college.ACT_75;
+    stats_address.innerText = college.ADDRESS;
+    stats_address.innerText = college.ADDRESS;
+    var test = parseInt(satbox.value) > 36 ? parseInt(satbox.value) : actToSatConvert(parseInt(satbox.value));
+    // ap5box is number of AP/IB, ap4box is honors classes taken
+    var _objective = getObjectiveScore(gpabox.value, ap5box.value, ap4box.value, test);
+    var comp = _objective + (sub / 3);
+    var subScaled = (sub / 3);
+    var collegeAP5 = (.9 / college.ADMISSION * 100); 
     var collegeAP4 = 0;
     var collegeAvgSAT = (college.SAT_25 + college.SAT_75) / 2;
     var collegeObjectiveScore75 = getObjectiveScore(college.GPA, collegeAP5, 0, college.SAT_75);
     var collegeObjectiveScore50 = getObjectiveScore(college.GPA, collegeAP5, 0, collegeAvgSAT);
     var aboveAverageApplicant = false; 
     var exceptionalApplicant = false; 
-    if (objectiveScoreFinal > collegeObjectiveScore50) aboveAverageApplicant = true;
-    if (objectiveScoreFinal > collegeObjectiveScore75) exceptionalApplicant = true; 
+    if (_objective > collegeObjectiveScore50) aboveAverageApplicant = true;
+    if (_objective > collegeObjectiveScore75) exceptionalApplicant = true; 
     if (aboveAverageApplicant = true) comp = (1.2 * _objective) + (.8) * (sub/2); 
-    if (exceptionalApplicant = true) comp = (1.4 * _objective) + (.6)(sub/2);
+    if (exceptionalApplicant = true) comp = (1.4 * _objective) + (.6) * (sub/2);
+    
     
     var _percent = getTotalApplicantScore(comp);
     finalscore.value = Math.round(_percent * 100) / 100 + "%";
 
     objective.innerText = _objective.toPrecision(4);
-    subjective.innerText = sub.toPrecision(4);
+    subjective.innerText = subScaled.toPrecision(4);
     composite.innerText = (Math.round(comp * 100) / 100).toPrecision(4);
     scaled.innerText = (Math.round(_percent * 100) / 100).toPrecision(4);
 
-    var index = ids.indexOf(cinput.value);
-    var college = actual_JSON[index];
-    stats_gpa.innerText = college.GPA;
-    stats_rate.innerText = college.ADMISSION;
-    stats_sat_25.innerText = college.SAT_25;
-    stats_sat_75.innerText = college.SAT_75;
-    stats_act_25.innerText = college.ACT_25;
-    stats_act_75.innerText = college.ACT_75;
-    stats_address.innerText = college.ADDRESS;
+   
+    
 }
 
 function getTotalApplicantScore(TA) {
+  
+   
+  
     var index = ids.indexOf(cinput.value);
-    var acceptance = actual_JSON[index].ADMISSION.replace("%", "") / 100;
+    var acceptance = actual_JSON[index].ADMISSION;
     if (TA >= 90) TA = 89.9; 
-    var final = 90 - TA;
+    var final = 112 - TA ;
     final /= acceptance;
     final /= TA;
     final = TA / final;
-    if (final > 100) final = 90 + (-1 / (TA / 100) + 10);
+    if (final > 100) final = 90 + (acceptance / 100) + (-1 / (TA / 100) + 10);
     return final;
 }
 
@@ -259,6 +303,22 @@ function loadJSON(callback) {
     xobj.send(null);
 }
 
+function loadText(callback) {
+    var xobj = new XMLHttpRequest();
+    xobj.overrideMimeType("text/plain");
+    xobj.open('GET', 'builddate', true);
+    xobj.onreadystatechange = function () {
+        if (xobj.readyState == 4 && xobj.status == "200") {
+            callback(xobj.responseText);
+        }
+    };
+    xobj.send(null);
+}
+
+loadText(function (response) {
+    document.getElementById('builddate').innerText = response.substring(response.indexOf(' ') + 1);
+});
+
 var visible = false;
 
 function toggleDetails() {
@@ -268,6 +328,18 @@ function toggleDetails() {
     } else {
         details.style = "display:inline";
         details_link.innerText = "Hide Details";
+    }
+    visible = !visible;
+}
+
+
+function toggleExplain() {
+    if (visible) {
+        explain.style = "display:none";
+        explain_link.innerText = "How does it work?";
+    } else {
+        explain.style = "display:inline";
+        explain_link.innerText = "Hide Explanation";
     }
     visible = !visible;
 }
