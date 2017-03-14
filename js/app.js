@@ -67,6 +67,8 @@ questions = [
     "I try my best to stay actively conscious and not drift off during the day."
 ];
 usedquestions = [];
+var SAT_MEAN = 1020;
+var SAT_S = 194;
 
 var actual_JSON;
 var ids = [];
@@ -104,28 +106,61 @@ $("span[title]").click(function () {
     }
 })
 
+function percentile(z)  {
+    // Source http://stackoverflow.com/questions/16194730/seeking-a-statistical-javascript-function-to-return-p-value-from-a-z-score
+    //z == number of standard deviations from the mean
+
+    //if z is greater than 6.5 standard deviations from the mean
+    //the number of significant digits will be outside of a reasonable 
+    //range
+    if ( z < -6.5)
+      return 0.0;
+    if( z > 6.5) 
+      return 1.0;
+
+    var factK = 1;
+    var sum = 0;
+    var term = 1;
+    var k = 0;
+    var loopStop = Math.exp(-23);
+    while(Math.abs(term) > loopStop) 
+    {
+      term = .3989422804 * Math.pow(-1,k) * Math.pow(z,k) / (2 * k + 1) / Math.pow(2,k) * Math.pow(z,k+1) / factK;
+      sum += term;
+      k++;
+      factK *= k;
+
+    }
+    sum += 0.5;
+
+    return sum;
+}
+
 function getObjectiveScore(gpa, apsTaken, honorsTaken, sat) {
     var index = ids.indexOf(cinput.value);
     var college = actual_JSON[index];
     var output = 0;
-    var max_sat = 1600;
-    var sat_coeff = sat / 100;
-    if (sat < college.SAT_25) sat_coeff = sat / 120;
-    if (sat > college.SAT_75) sat_coeff = sat / 80;
-    output += sat_coeff * (sat / max_sat); 
-    console.log(sat);
-    var gpa_coeff = gpa / 0.2;
-    if (gpa < college.GPA) gpa_coeff = gpa / 0.25;
-    var max_gpa = 4;
-    output += gpa_coeff * (gpa / max_gpa);
-    console.log(output);
- 
-    var honorsWeight = 0.5;
-    var aps = parseFloat(apsTaken) + honorsTaken * honorsWeight;
-    if (aps > 10) aps = 10;
-    var objectiveScoreFinal = output + aps;
+    // Standardized Test Weighting
+    // Maximum Score is 20 for Perfect SAT
+    var satCoeff = sat / 100;
+    if (sat < parseInt(college.SAT_25)) satCoeff = sat / 120;
+    if (sat > parseInt(college.SAT_75)) satCoeff = sat / 80;
+    output += satCoeff * percentile((sat - SAT_MEAN) / SAT_S);
 
-    return Math.round(100 * (objectiveScoreFinal)) / 100;
+    // Grade Point Average Weighting
+    // Maximum Score is 20 for Perfect 4.0 GPA
+    var gpaCoeff = gpa * 5;
+    if (gpa < parseFloat(college.GPA) * 0.8) gpaCoeff = gpa * 3;
+    else if (gpa < parseFloat(college.GPA)) gpaCoeff = gpa * 4;
+    output += gpaCoeff * (gpa / 4);
+
+    // Course Rigor Weighting
+    // Maximum Score is 10 for 10+ AP-Equiv Classes
+    var honorsWeight = 0.5;
+    output += Math.min(apsTaken + honorsTaken * honorsWeight, 10);
+
+    // Maximum Score is 50
+    return output;
 }
 
 function actToSatConvert(testScore) {
@@ -162,11 +197,9 @@ function actToSatConvert(testScore) {
     }
 }
 
-
-
-
-getdata.onclick = function () {
-    if ((satbox.value > 36 && satbox.value < 400) || satbox.value < 1 || satbox.value > 1600) {
+getdata.onclick = function() {
+    // Data validation
+    if ((satbox.value > 36 && satbox.value < 400) || satbox.value < 11 || satbox.value > 1600) {
         alert("Please enter a valid test score.");
         return;
     }
@@ -177,61 +210,58 @@ getdata.onclick = function () {
     if (gpabox.value < 0 || gpabox.value > 4) {
         return;
     }
-    // getdata.disabled = true;
+
+    // Integration of college information
     details_link.style = "border-bottom: 1px dotted; cursor: pointer; display: inline";
     var index = ids.indexOf(cinput.value);
     var college = actual_JSON[index];
     stats_gpa.innerText = college.GPA;
-    stats_rate.innerText = college.ADMISSION * 100;
+    stats_rate.innerText = (parsefloat(college.ADMISSION) * 100).toPrecision(2);
     stats_sat_25.innerText = college.SAT_25;
     stats_sat_75.innerText = college.SAT_75;
     stats_act_25.innerText = college.ACT_25;
     stats_act_75.innerText = college.ACT_75;
     stats_address.innerText = college.ADDRESS;
     stats_address.innerText = college.ADDRESS;
-    var test = parseInt(satbox.value) > 36 ? parseInt(satbox.value) : actToSatConvert(parseInt(satbox.value));
-    // ap5box is number of AP/IB, ap4box is honors classes taken
-    var _objective = getObjectiveScore(gpabox.value, ap5box.value, ap4box.value, test);
-    var comp = _objective + (sub / 3);
-    var subScaled = (sub / 3);
-    var collegeAP5 = (.9 / college.ADMISSION * 100); 
-    var collegeAP4 = 0;
-    var collegeAvgSAT = (college.SAT_25 + college.SAT_75) / 2;
-    var collegeObjectiveScore75 = getObjectiveScore(college.GPA, collegeAP5, 0, college.SAT_75);
-    var collegeObjectiveScore50 = getObjectiveScore(college.GPA, collegeAP5, 0, collegeAvgSAT);
-    var aboveAverageApplicant = false; 
-    var exceptionalApplicant = false; 
-    if (_objective > collegeObjectiveScore50) aboveAverageApplicant = true;
-    if (_objective > collegeObjectiveScore75) exceptionalApplicant = true; 
-    if (aboveAverageApplicant = true) comp = (1.2 * _objective) + (.8) * (sub/2); 
-    if (exceptionalApplicant = true) comp = (1.4 * _objective) + (.6) * (sub/2);
-    
-    
-    var _percent = getTotalApplicantScore(comp);
-    finalscore.value = Math.round(_percent * 100) / 100 + "%";
 
-    objective.innerText = _objective.toPrecision(4);
-    subjective.innerText = subScaled.toPrecision(4);
-    composite.innerText = (Math.round(comp * 100) / 100).toPrecision(4);
-    scaled.innerText = (Math.round(_percent * 100) / 100).toPrecision(4);
+    // Personal Scores
+    var testValue = parseInt(satbox.value) > 36 ? parseInt(satbox.value) : actToSatConvert(parseInt(satbox.value));
+    var pObjectiveScore = getObjectiveScore(parseFloat(gpabox.value), parseFloat(ap5box.value), parseFloat(ap4box.value), testValue);
+    var pSubjectiveScore = sub / 3;
 
-   
-    
+    // College Specific Scores
+    var cAP = parseFloat(college.ADMISSION) * 10;
+    var cObjective75 = getObjectiveScore(parseFloat(college.GPA), cAP * 1.2, 0, parseInt(college.SAT_75));
+    var cObjective50 = getObjectiveScore(parseFloat(college.GPA), cAP, 0, (parseInt(college.SAT_75) + parseInt(college.SAT_25)) / 2);
+    var cObjective25 = getObjectiveScore(parseFloat(college.GPA), cAP * 0.8, 0, parseInt(college.SAT_25));
+    var cComprehensiveScore = cObjective50 + 50 * (1 - parseFloat(college.ADMISSION));
+    var exceptionalApplicant = pObjectiveScore > cObjective75;
+    var aboveAverageApplicant = pObjectiveScore > cObjective50;
+    var belowAverageApplicant = pObjectiveScore < cObjective25;
+
+    // Calculate Final Projected Scores
+    var pComprehensiveScore = pObjectiveScore + pSubjectiveScore;
+    if (exceptionalApplicant) {
+        pComprehensiveScore = Math.min(100, pComprehensiveScore * 1.05);
+    } else if (aboveAverageApplicant)  {
+        pComprehensiveScore = Math.min(100, pComprehensiveScore * 1.025);
+    } else if (belowAverageApplicant) {
+        pComprehensiveScore *= 0.9;
+    }
+    var percent = getTotalApplicantScore(pComprehensiveScore, cComprehensiveScore);
+
+    finalscore.value = percent.toPrecision(2) + "%";
+    objective.innerText = pObjectiveScore.toPrecision(4);
+    subjective.innerText = pSubjectiveScore.toPrecision(4);
+    composite.innerText = pComprehensiveScore.toPrecision(4);
+    scaled.innerText = percent.toPrecision(4);
 }
 
-function getTotalApplicantScore(TA) {
-  
-   
-  
+function getTotalApplicantScore(pTA, cTA) {
     var index = ids.indexOf(cinput.value);
-    var acceptance = actual_JSON[index].ADMISSION;
-    if (TA >= 90) TA = 89.9; 
-    var final = 112 - TA ;
-    final /= acceptance;
-    final /= TA;
-    final = TA / final;
-    if (final > 100) final = 90 + (acceptance / 100) + (-1 / (TA / 100) + 10);
-    return final;
+    var acceptance = parseFloat(actual_JSON[index].ADMISSION) * 100;
+    var curve = 3 * (pTA - cTA);
+    return Math.max(Math.min(acceptance + curve, 95), 5);
 }
 
 
